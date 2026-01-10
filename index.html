@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bio Guess Who – Online Multiplayer</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: linear-gradient(135deg, #fce4ec, #e3f2fd);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 10px;
+}
+.card {
+    background: #fff;
+    padding: 25px;
+    width: 500px;
+    border-radius: 20px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    text-align: center;
+}
+input, button {
+    width: 90%;
+    padding: 10px;
+    margin: 6px;
+    border-radius: 10px;
+}
+button {
+    background: #9575cd;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+.hidden { display:none; }
+#log {
+    background:#f5f5f5;
+    padding:10px;
+    max-height:150px;
+    overflow-y:auto;
+    text-align:left;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card" id="setup">
+    <h2>🧬 Bio Guess Who (Online)</h2>
+
+    <button onclick="hostGame()">Host Game</button><br>
+    <input id="roomInput" placeholder="Enter Room Code">
+    <button onclick="joinGame()">Join Game</button>
+
+    <hr>
+    <input id="secretInput" type="password" placeholder="Enter your secret term">
+    <button onclick="submitSecret()">Submit Secret</button>
+</div>
+
+<div class="card hidden" id="game">
+    <h3 id="turnText"></h3>
+    <p>Round: <b><span id="roundText">1</span> / 5</b></p>
+    <p>Questions left: <b><span id="questions">2</span></b></p>
+
+    <input id="questionInput" placeholder="Ask YES/NO question">
+    <button onclick="askQuestion()">Ask</button>
+
+    <button onclick="answer('YES')">YES</button>
+    <button onclick="answer('NO')">NO</button>
+
+    <hr>
+
+    <input id="guessInput" placeholder="Type your guess">
+    <button onclick="submitGuess()">Submit Guess</button>
+
+    <div id="log"></div>
+</div>
+
+<script>
+// 🔥 FIREBASE CONFIG — REPLACE WITH YOUR OWN
+firebase.initializeApp({
+  apiKey: "AIzaSyAc3cG9ui8aN6aBOYU6Zg24t2RtX5l1uMo",
+  authDomain: "guess-who-with-biology.firebaseapp.com",
+  databaseURL: "https://guess-who-with-biology-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "guess-who-with-biology",
+});
+const db = firebase.database();
+
+// GLOBALS
+let roomCode = "";
+let player = 0;
+let gameRef = null;
+
+// HOST GAME
+function hostGame(){
+    roomCode = Math.random().toString(36).substring(2,7);
+    player = 1;
+    gameRef = db.ref("games/" + roomCode);
+
+    gameRef.set({
+        round: 1,
+        maxRounds: 5,
+        currentPlayer: 1,
+        questionsLeft: 2,
+        awaitingAnswer: false,
+        p1Secret: "",
+        p2Secret: "",
+        log: [],
+        winner: 0
+    });
+
+    alert("Room Code: " + roomCode);
+    startListening();
+}
+
+// JOIN GAME
+function joinGame(){
+    roomCode = roomInput.value.trim();
+    if(!roomCode) return alert("Enter room code");
+
+    gameRef = db.ref("games/" + roomCode);
+    gameRef.once("value", snap => {
+        if(!snap.exists()) return alert("Room not found");
+        player = 2;
+        startListening();
+    });
+}
+
+// SUBMIT SECRET
+function submitSecret(){
+    const secret = secretInput.value.trim();
+    if(!secret || !gameRef) return;
+
+    if(player === 1){
+        gameRef.update({ p1Secret: secret });
+    } else {
+        gameRef.update({ p2Secret: secret });
+    }
+
+    setup.classList.add("hidden");
+    game.classList.remove("hidden");
+}
+
+// REALTIME SYNC
+function startListening(){
+    gameRef.on("value", snap => {
+        const s = snap.val();
+        if(!s) return;
+
+        turnText.textContent =
+            s.winner
+            ? (s.winner === -1 ? "Draw!" : `Player ${s.winner} Wins!`)
+            : `Player ${s.currentPlayer}'s Turn`;
+
+        roundText.textContent = s.round;
+        questions.textContent = s.questionsLeft;
+
+        log.innerHTML = s.log.map(l=>`<p>${l}</p>`).join("");
+    });
+}
+
+// ASK QUESTION
+function askQuestion(){
+    gameRef.once("value", snap=>{
+        const s = snap.val();
+        if(s.currentPlayer !== player || s.questionsLeft === 0) return;
+
+        const q = questionInput.value.trim();
+        if(!q) return;
+
+        gameRef.update({
+            awaitingAnswer: true,
+            log: s.log.concat(`🟣 P${player}: ${q}`)
+        });
+
+        questionInput.value="";
+    });
+}
+
+// ANSWER
+function answer(ans){
+    gameRef.once("value", snap=>{
+        const s = snap.val();
+        if(!s.awaitingAnswer || s.currentPlayer === player) return;
+
+        gameRef.update({
+            awaitingAnswer: false,
+            questionsLeft: s.questionsLeft - 1,
+            log: s.log.concat(`🟢 Answer: ${ans}`)
+        });
+    });
+}
+
+// SUBMIT GUESS
+function submitGuess(){
+    gameRef.once("value", snap=>{
+        const s = snap.val();
+        if(s.currentPlayer !== player) return;
+
+        const guess = guessInput.value.trim().toLowerCase();
+        const correct = player === 1
+            ? s.p2Secret.toLowerCase()
+            : s.p1Secret.toLowerCase();
+
+        let newLog = s.log.concat(`🟣 P${player} guessed: ${guess}`);
+
+        if(guess === correct){
+            gameRef.update({ winner: player, log: newLog });
+        } else {
+            endTurn(s, newLog);
+        }
+    });
+}
+
+// TURN + ROUND CONTROL
+function endTurn(s, log){
+    let nextPlayer = s.currentPlayer === 1 ? 2 : 1;
+    let nextRound = s.round;
+
+    if(s.currentPlayer === 2){
+        nextRound++;
+        if(nextRound > s.maxRounds){
+            gameRef.update({
+                winner: -1,
+                log: log.concat("⏹️ Game ended in a draw")
+            });
+            return;
+        }
+    }
+
+    gameRef.update({
+        currentPlayer: nextPlayer,
+        round: nextRound,
+        questionsLeft: 2,
+        awaitingAnswer: false,
+        log: log
+    });
+}
+</script>
+</body>
+</html>
