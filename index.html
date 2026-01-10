@@ -10,45 +10,30 @@ h1 { color:#5c6bc0; }
 button { background:#9575cd; color:white; border:none; border-radius:10px; padding:8px 12px; margin:5px; cursor:pointer; }
 button:hover { background:#7e57c2; }
 input { width:95%; padding:8px; margin:5px 0; border-radius:8px; border:1px solid #cfd8dc; }
-
-#deductionBoard {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-top: 10px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-.tile {
-  padding: 10px;
-  border: 1px solid #cfd8dc;
-  border-radius: 8px;
-  text-align: center;
-  cursor: pointer;
-  background: #fafafa;
-  font-size: 14px;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tile.used {
-  opacity: 0.4;
-  background: #ddd;
-  pointer-events: none;
-}
-
+#deductionBoard { display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; margin-top:10px; max-height:300px; overflow-y:auto; }
+.tile { padding:10px; border:1px solid #cfd8dc; border-radius:8px; text-align:center; cursor:pointer; background:#fafafa; font-size:14px; min-height:40px; display:flex; align-items:center; justify-content:center; }
+.tile.used { opacity:0.4; background:#ddd; pointer-events:none; }
 #log { background:#f5f5f5; padding:10px; border-radius:6px; max-height:120px; overflow-y:auto; margin-top:10px; font-size:14px; }
-
 .hidden { display:none; }
+#setupDeduction, #ruleBoard { background:#f5f5f5; border:1px solid #cfd8dc; border-radius:8px; padding:10px; max-height:200px; overflow-y:auto; margin-top:10px; font-size:14px; }
 </style>
 </head>
 <body>
 
 <div class="card" id="setup">
   <h1>🧬 Bio Guess Who – Live</h1>
+  <div id="ruleBoard">
+    <strong>Rules:</strong>
+    <p>Guess the opponent's word and you will win! Ask yes/no questions to acquire hints about the word you are guessing.</p>
+  </div>
   <input id="playerName" placeholder="Your Name">
   <input id="secretTerm" placeholder="Your secret term">
+
+  <div id="setupDeduction">
+    <strong>Allowed terms:</strong>
+    <div id="setupTiles"></div>
+  </div>
+
   <button onclick="createRoom()">Create Game</button>
   <input id="roomCode" placeholder="Room code to join">
   <button onclick="joinRoom()">Join Game</button>
@@ -56,12 +41,22 @@ input { width:95%; padding:8px; margin:5px 0; border-radius:8px; border:1px soli
 
 <div class="card hidden" id="game">
   <h2 id="turnText"></h2>
-  <p>Round: <span id="round">1</span>/5</p>
-  <input id="questionInput" placeholder="Ask a YES/NO question">
-  <button onclick="askQuestion()">Ask Question</button>
-  <p>Answer the question:</p>
-  <button onclick="answer('YES')">YES</button>
-  <button onclick="answer('NO')">NO</button>
+  <p>Round: <span id="round">1</span>/10</p>
+  
+  <div id="qaSection">
+    <input id="questionInput" placeholder="Ask a YES/NO question">
+    <button onclick="askQuestion()">Ask Question</button>
+    <p>Answer the question:</p>
+    <button onclick="answer('YES')">YES</button>
+    <button onclick="answer('NO')">NO</button>
+  </div>
+
+  <div id="guessSection" class="hidden">
+    <h3>Time to Guess!</h3>
+    <input id="guessInput" placeholder="Enter your guess for opponent's secret term">
+    <button onclick="submitGuess()">Submit Guess</button>
+  </div>
+
   <h3>Deduction Board</h3>
   <div id="deductionBoard"></div>
   <div id="log"></div>
@@ -86,7 +81,7 @@ let player = null;
 let secret = "";
 let playerNumber = null;
 let currentRound = 1;
-const maxRounds = 5;
+const maxRounds = 10;
 
 // ===== Deduction tiles =====
 const tiles = [
@@ -101,6 +96,7 @@ function createRoom(){
   player = document.getElementById("playerName").value.trim();
   secret = document.getElementById("secretTerm").value.trim();
   if(!player || !secret){ alert("Enter name and secret term!"); return; }
+  if(!tiles.includes(secret)){ alert("Secret term must be from the allowed list!"); return; }
   room = Math.random().toString(36).substr(2,5).toUpperCase();
   playerNumber = 1;
   db.ref('rooms/'+room).set({
@@ -112,7 +108,8 @@ function createRoom(){
     round: 1,
     question: "",
     answer: "",
-    log: []
+    log: [],
+    guesses: {}
   });
   alert("Game created! Room code: "+room);
   startGameUI();
@@ -123,6 +120,7 @@ function joinRoom(){
   secret = document.getElementById("secretTerm").value.trim();
   room = document.getElementById("roomCode").value.trim().toUpperCase();
   if(!player || !secret || !room){ alert("Enter name, secret term, and room code!"); return; }
+  if(!tiles.includes(secret)){ alert("Secret term must be from the allowed list!"); return; }
   db.ref('rooms/'+room).get().then(snapshot=>{
     if(!snapshot.exists()){ alert("Room not found"); return; }
     const data = snapshot.val();
@@ -141,7 +139,20 @@ function startGameUI(){
   listenRoom();
 }
 
-// ===== Deduction Board =====
+// ===== Display deduction list in setup =====
+function displaySetupTiles(){
+  const container = document.getElementById("setupTiles");
+  container.innerHTML = "";
+  tiles.forEach(t=>{
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.textContent = t;
+    container.appendChild(tile);
+  });
+}
+displaySetupTiles();
+
+// ===== Deduction Board in game =====
 function loadDeductionBoard(){
   const board = document.getElementById("deductionBoard");
   board.innerHTML = "";
@@ -161,12 +172,25 @@ function listenRoom(){
     if(!data) return;
     currentRound = data.round;
     document.getElementById("round").textContent = currentRound;
+
     let turnPlayer = data.turn===1?data.p1Name:data.p2Name;
     document.getElementById("turnText").textContent = "Turn: "+turnPlayer;
+
     const l = document.getElementById("log");
     l.innerHTML = "";
     if(data.question) log(turnPlayer + " asked: " + data.question);
     if(data.answer) log("Answer: " + data.answer);
+
+    // After maxRounds, show guess section
+    if(currentRound > maxRounds){
+      document.getElementById("qaSection").classList.add("hidden");
+      document.getElementById("guessSection").classList.remove("hidden");
+    }
+
+    // Check if both guesses are in to announce winner
+    if(data.guesses && data.guesses.p1 && data.guesses.p2){
+      announceWinner(data);
+    }
   });
 }
 
@@ -194,18 +218,43 @@ function answer(ans){
 // ===== Turns & Rounds =====
 function endTurn(){
   currentRound++;
-  if(currentRound > maxRounds){
-    alert("Max rounds reached! Game over.");
-    return;
+  if(currentRound <= maxRounds){
+    db.ref('rooms/'+room+'/round').set(currentRound);
+    db.ref('rooms/'+room).get().then(snapshot=>{
+      const data = snapshot.val();
+      const nextTurn = data.turn === 1 ? 2 : 1;
+      db.ref('rooms/'+room+'/turn').set(nextTurn);
+    });
+  } else {
+    document.getElementById("qaSection").classList.add("hidden");
+    document.getElementById("guessSection").classList.remove("hidden");
   }
-  db.ref('rooms/'+room+'/round').set(currentRound);
-  db.ref('rooms/'+room).get().then(snapshot=>{
-    const data = snapshot.val();
-    const nextTurn = data.turn === 1 ? 2 : 1;
-    db.ref('rooms/'+room+'/turn').set(nextTurn);
-  });
 }
 
+// ===== Guessing =====
+function submitGuess(){
+  const guess = document.getElementById("guessInput").value.trim();
+  if(!guess) return alert("Enter your guess!");
+  if(!tiles.includes(guess)){ alert("Guess must be from the allowed list!"); return; }
+  const key = playerNumber===1?"p1":"p2";
+  db.ref('rooms/'+room+'/guesses/'+key).set(guess);
+  document.getElementById("guessInput").value="";
+  log("Your guess submitted: "+guess);
+}
+
+// ===== Winner announcement =====
+function announceWinner(data){
+  const p1Correct = data.guesses.p1.toLowerCase() === data.p2Secret.toLowerCase();
+  const p2Correct = data.guesses.p2.toLowerCase() === data.p1Secret.toLowerCase();
+  let message = "";
+  if(p1Correct && p2Correct) message = `Both guessed correctly! It's a tie!`;
+  else if(p1Correct) message = `Player 1 (${data.p1Name}) wins!`;
+  else if(p2Correct) message = `Player 2 (${data.p2Name}) wins!`;
+  else message = `No one guessed correctly! No winner.`;
+  alert(message);
+  log(message);
+}
+  
 // ===== Log helper =====
 function log(msg){
   const l = document.getElementById("log");
