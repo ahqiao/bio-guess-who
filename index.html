@@ -10,17 +10,43 @@ h1 { color:#5c6bc0; }
 button { background:#9575cd; color:white; border:none; border-radius:10px; padding:8px 12px; margin:5px; cursor:pointer; }
 button:hover { background:#7e57c2; }
 input { width:95%; padding:8px; margin:5px 0; border-radius:8px; border:1px solid #cfd8dc; }
-#deductionBoard { display:grid; grid-template-columns: repeat(2, 1fr); gap:5px; margin-top:10px; }
-.tile { padding:6px; border:1px solid #cfd8dc; border-radius:6px; text-align:center; cursor:pointer; background:#fafafa; transition:0.3s; }
-.tile.used { opacity:0.4; background:#ddd; pointer-events:none; }
+
+#deductionBoard {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.tile {
+  padding: 10px;
+  border: 1px solid #cfd8dc;
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  background: #fafafa;
+  font-size: 14px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tile.used {
+  opacity: 0.4;
+  background: #ddd;
+  pointer-events: none;
+}
+
 #log { background:#f5f5f5; padding:10px; border-radius:6px; max-height:120px; overflow-y:auto; margin-top:10px; font-size:14px; }
+
+.hidden { display:none; }
 </style>
 </head>
 <body>
 
 <div class="card" id="setup">
   <h1>🧬 Bio Guess Who – Live</h1>
-  <p>Enter secret terms and create/join a game</p>
   <input id="playerName" placeholder="Your Name">
   <input id="secretTerm" placeholder="Your secret term">
   <button onclick="createRoom()">Create Game</button>
@@ -50,7 +76,7 @@ const firebaseConfig = {
   authDomain: "guess-who-with-biology.firebaseapp.com",
   databaseURL: "https://guess-who-with-biology-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "guess-who-with-biology",
-});
+};
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -60,14 +86,14 @@ let player = null;
 let secret = "";
 let playerNumber = null;
 let currentRound = 1;
-let maxRounds = 5;
+const maxRounds = 5;
 
 // ===== Deduction tiles =====
 const tiles = [
-  "Heart","Kidney","Liver","Lungs","Stomach","Intestine","Pancreas","Brain", // organs
-  "Femur","Humerus","Skull","Rib","Vertebra","Clavicle","Tibia","Fibula", // bones
-  "Amylase","Lipase","Pepsin","Trypsin","DNA Polymerase","Catalase","Lactase", // enzymes
-  "Red Blood Cell","White Blood Cell","Neuron","Muscle Cell","Epithelial Cell","Sperm Cell","Egg Cell","Mitochondrion","Nucleus","Ribosome","Chloroplast" // cells
+  "Heart","Kidney","Liver","Lungs","Stomach","Intestine","Pancreas","Brain",
+  "Femur","Humerus","Skull","Rib","Vertebra","Clavicle","Tibia","Fibula",
+  "Amylase","Lipase","Pepsin","Trypsin","DNA Polymerase","Catalase","Lactase",
+  "Red Blood Cell","White Blood Cell","Neuron","Muscle Cell","Epithelial Cell","Sperm Cell","Egg Cell","Mitochondrion","Nucleus","Ribosome","Chloroplast"
 ];
 
 // ===== Setup functions =====
@@ -89,10 +115,7 @@ function createRoom(){
     log: []
   });
   alert("Game created! Room code: "+room);
-  document.getElementById("setup").classList.add("hidden");
-  document.getElementById("game").classList.remove("hidden");
-  loadDeductionBoard();
-  listenRoom();
+  startGameUI();
 }
 
 function joinRoom(){
@@ -107,14 +130,18 @@ function joinRoom(){
     playerNumber = 2;
     db.ref('rooms/'+room+'/p2Name').set(player);
     db.ref('rooms/'+room+'/p2Secret').set(secret);
-    document.getElementById("setup").classList.add("hidden");
-    document.getElementById("game").classList.remove("hidden");
-    loadDeductionBoard();
-    listenRoom();
+    startGameUI();
   });
 }
 
-// ===== Deduction board =====
+function startGameUI(){
+  document.getElementById("setup").classList.add("hidden");
+  document.getElementById("game").classList.remove("hidden");
+  loadDeductionBoard();
+  listenRoom();
+}
+
+// ===== Deduction Board =====
 function loadDeductionBoard(){
   const board = document.getElementById("deductionBoard");
   board.innerHTML = "";
@@ -122,9 +149,7 @@ function loadDeductionBoard(){
     const tile = document.createElement("div");
     tile.className = "tile";
     tile.textContent = t;
-    tile.onclick = ()=>{
-      tile.classList.toggle("used");
-    };
+    tile.onclick = ()=> tile.classList.toggle("used");
     board.appendChild(tile);
   });
 }
@@ -138,38 +163,47 @@ function listenRoom(){
     document.getElementById("round").textContent = currentRound;
     let turnPlayer = data.turn===1?data.p1Name:data.p2Name;
     document.getElementById("turnText").textContent = "Turn: "+turnPlayer;
-    if(data.question && data.answer){
-      log(turnPlayer + " asked: " + data.question);
-      log("Answer: " + data.answer);
-    }
+    const l = document.getElementById("log");
+    l.innerHTML = "";
+    if(data.question) log(turnPlayer + " asked: " + data.question);
+    if(data.answer) log("Answer: " + data.answer);
   });
 }
 
 // ===== Question/Answer =====
 function askQuestion(){
-  if(playerNumber !== currentRoundTurn()) { alert("Not your turn"); return; }
-  const q = document.getElementById("questionInput").value.trim();
-  if(!q) return;
-  db.ref('rooms/'+room).update({ question: q, answer: "" });
-  document.getElementById("questionInput").value="";
+  db.ref('rooms/'+room).get().then(snapshot=>{
+    const data = snapshot.val();
+    if(playerNumber !== data.turn){ alert("Not your turn"); return; }
+    const q = document.getElementById("questionInput").value.trim();
+    if(!q) return;
+    db.ref('rooms/'+room).update({ question: q, answer: "" });
+    document.getElementById("questionInput").value="";
+  });
 }
 
 function answer(ans){
-  if(playerNumber === currentRoundTurn()) { alert("Wait for opponent to ask"); return; }
-  db.ref('rooms/'+room).update({ answer: ans });
-  endTurn();
+  db.ref('rooms/'+room).get().then(snapshot=>{
+    const data = snapshot.val();
+    if(playerNumber === data.turn){ alert("Wait for opponent to ask"); return; }
+    db.ref('rooms/'+room).update({ answer: ans });
+    endTurn();
+  });
 }
 
-// ===== Turns =====
-function currentRoundTurn(){ return (currentRound % 2 === 1)? 1 : 2; }
-
+// ===== Turns & Rounds =====
 function endTurn(){
   currentRound++;
-  if(currentRound>maxRounds){
+  if(currentRound > maxRounds){
     alert("Max rounds reached! Game over.");
     return;
   }
   db.ref('rooms/'+room+'/round').set(currentRound);
+  db.ref('rooms/'+room).get().then(snapshot=>{
+    const data = snapshot.val();
+    const nextTurn = data.turn === 1 ? 2 : 1;
+    db.ref('rooms/'+room+'/turn').set(nextTurn);
+  });
 }
 
 // ===== Log helper =====
