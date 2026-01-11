@@ -2,143 +2,72 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Bio Guess Who – Live Multiplayer</title>
-
+<title>Bio Guess Who – Multiplayer</title>
 <style>
-body {
-  font-family: "Segoe UI", Arial, sans-serif;
-  background:#f0f0f0;
-  padding:10px;
-  display:flex;
-  justify-content:center;
-}
-
-.card {
-  background:#fff;
-  padding:20px;
-  border-radius:12px;
-  width:520px;
-  box-shadow:0 5px 15px rgba(0,0,0,0.1);
-}
-
-h1, h2, h3 { color:#5c6bc0; }
-
-button {
-  background:#9575cd;
-  color:white;
-  border:none;
-  border-radius:10px;
-  padding:8px 12px;
-  margin:5px;
-  cursor:pointer;
-}
+body { font-family:"Segoe UI", Arial, sans-serif; background:#f0f0f0; display:flex; justify-content:center; padding:10px; }
+.card { background:#fff; padding:20px; border-radius:12px; width:550px; box-shadow:0 5px 15px rgba(0,0,0,0.1); }
+h1,h2,h3 { color:#5c6bc0; margin-bottom:8px; }
+button { background:#9575cd; color:white; border:none; border-radius:10px; padding:8px 12px; margin:5px; cursor:pointer; }
 button:hover { background:#7e57c2; }
-
-input {
-  width:95%;
-  padding:8px;
-  margin:5px 0;
-  border-radius:8px;
-  border:1px solid #cfd8dc;
-}
-
+input { width:95%; padding:8px; margin:5px 0; border-radius:8px; border:1px solid #cfd8dc; }
 .hidden { display:none; }
-
-#deductionBoard {
-  display:grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap:5px;
-  max-height:200px;
-  overflow-y:auto;
-}
-
-.tile {
-  padding:6px;
-  border:1px solid #cfd8dc;
-  border-radius:6px;
-  text-align:center;
-  cursor:pointer;
-  background:#fafafa;
-}
+#deductionBoard { display:grid; grid-template-columns: repeat(2,1fr); gap:5px; max-height:200px; overflow-y:auto; margin-bottom:10px; }
+.tile { padding:6px; border:1px solid #cfd8dc; border-radius:6px; text-align:center; cursor:pointer; background:#fafafa; }
 .tile.used { opacity:0.4; background:#ddd; }
-
-#chatBox {
-  background:#f5f5f5;
-  padding:10px;
-  border-radius:6px;
-  max-height:220px;
-  overflow-y:auto;
-  font-size:14px;
-  margin-top:8px;
-}
-
-.system {
-  color:#455a64;
-  font-style:italic;
-}
-
-#allowedWords {
-  background:#e8eaf6;
-  padding:8px;
-  border-radius:6px;
-  font-size:12px;
-  margin-bottom:5px;
-  max-height:120px;
-  overflow-y:auto;
-}
+#chatBox { background:#f5f5f5; padding:10px; border-radius:6px; max-height:220px; overflow-y:auto; font-size:14px; margin-top:8px; }
+.system { color:#455a64; font-style:italic; }
+#allowedWords { background:#e8eaf6; padding:8px; border-radius:6px; font-size:12px; margin-bottom:5px; max-height:120px; overflow-y:auto; }
+#allowedWords span { cursor:pointer; padding:2px 4px; border-radius:4px; margin:2px; display:inline-block; background:#c5cae9; }
+#allowedWords span:hover { background:#9fa8da; }
 </style>
 </head>
-
 <body>
 
-<!-- ===== SETUP SCREEN ===== -->
 <div class="card" id="setup">
-  <h1>🧬 Bio Guess Who – Live</h1>
+<h1>🧬 Bio Guess Who – Live</h1>
 
-  <div id="rules" style="background:#e8eaf6; padding:10px; border-radius:8px; margin-bottom:10px;">
-    <strong>Rules:</strong><br>
-    Guess the opponent's word to win!<br>
-    Ask YES/NO questions to acquire hints.<br>
-    Maximum 10 rounds. After 10 rounds, both players submit their guesses and a winner is announced.
-  </div>
-
-  <input id="playerName" placeholder="Your Name">
-
-  <!-- Allowed words display -->
-  <div id="allowedWords"></div>
-  <input id="secretTerm" placeholder="Your Secret Term (choose from above)">
-  
-  <button onclick="createRoom()">Create Game</button>
-  <input id="roomCode" placeholder="Room Code">
-  <button onclick="joinRoom()">Join Game</button>
+<div id="rules" style="background:#e8eaf6; padding:10px; border-radius:8px; margin-bottom:10px;">
+<strong>Rules:</strong><br>
+Guess the opponent's word to win! Ask YES/NO questions. Maximum 10 rounds. After 10 rounds, both players submit guesses and a winner is announced.
 </div>
 
-<!-- ===== GAME SCREEN ===== -->
+<input id="playerName" placeholder="Your Name">
+
+<div id="allowedWords">
+<!-- Words will populate here -->
+</div>
+
+<input id="secretTerm" placeholder="Your secret term (choose from above)">
+
+<button onclick="createRoom()">Create Game</button>
+<input id="roomCode" placeholder="Room Code">
+<button onclick="joinRoom()">Join Game</button>
+</div>
+
 <div class="card hidden" id="game">
-  <h2 id="turnText"></h2>
-  <p>Round: <span id="round">1</span>/10</p>
+<h2 id="turnText"></h2>
+<p>Round: <span id="round">1</span>/10</p>
 
-  <input id="questionInput" placeholder="Ask a YES/NO question">
-  <button onclick="askQuestion()">Ask Question</button>
+<input id="questionInput" placeholder="Ask a YES/NO question">
+<button onclick="askQuestion()">Ask Question</button>
 
-  <p><strong>Answer:</strong></p>
-  <button onclick="answer('YES')">YES</button>
-  <button onclick="answer('NO')">NO</button>
+<p><strong>Answer:</strong></p>
+<button onclick="answer('YES')">YES</button>
+<button onclick="answer('NO')">NO</button>
 
-  <h3>Deduction Board</h3>
-  <div id="deductionBoard"></div>
+<h3>Deduction Board</h3>
+<div id="deductionBoard"></div>
 
-  <div id="guessSection" class="hidden">
-    <h3>Submit your guess!</h3>
-    <input id="guessInput" placeholder="Type your guess">
-    <button onclick="submitGuess()">Submit Guess</button>
-  </div>
+<div id="guessSection" class="hidden">
+<h3>Submit your guess!</h3>
+<input id="guessInput" placeholder="Type your guess">
+<button onclick="submitGuess()">Submit Guess</button>
+</div>
 
-  <h3>💬 Chat</h3>
-  <div id="chatBox"></div>
-  <input id="chatInput" placeholder="Type a message..."
-         onkeydown="if(event.key==='Enter') sendChat()">
-  <button onclick="sendChat()">Send</button>
+<h3>💬 Chat</h3>
+<div id="chatBox"></div>
+<input id="chatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendChat()">
+<button onclick="sendChat()">Send</button>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -158,38 +87,44 @@ const db = firebase.database();
 let room, player, secret, playerNumber;
 const maxRounds = 10;
 
-// ===== Full deduction board / allowed words =====
-const tiles = [
-  "Heart","Kidney","Liver","Lungs","Stomach","Intestine","Pancreas","Brain",
-  "Femur","Humerus","Skull","Rib","Vertebra","Clavicle","Tibia","Fibula",
-  "Amylase","Lipase","Pepsin","Trypsin","DNA Polymerase","Catalase","Lactase",
-  "Red Blood Cell","White Blood Cell","Neuron","Muscle Cell","Epithelial Cell",
-  "Sperm Cell","Egg Cell","Mitochondrion","Nucleus","Ribosome","Chloroplast"
+// Expanded deduction board
+const tiles=[
+"Heart","Kidney","Liver","Lungs","Stomach","Intestine","Pancreas","Brain",
+"Femur","Humerus","Skull","Rib","Vertebra","Clavicle","Tibia","Fibula",
+"Amylase","Lipase","Pepsin","Trypsin","DNA Polymerase","Catalase","Lactase",
+"Red Blood Cell","White Blood Cell","Neuron","Muscle Cell","Epithelial Cell",
+"Sperm Cell","Egg Cell","Mitochondrion","Nucleus","Ribosome","Chloroplast",
+"Golgi Apparatus","Endoplasmic Reticulum","Lysosome","Peroxisome","Cytoplasm",
+"Cell Membrane","Centrosome","Microtubule","Actin Filament","Chromosome"
 ];
 
-// Display allowed words for secret term input
-allowedWords.innerHTML = "Allowed words:<br>" + tiles.join(", ");
+// Display allowed words and allow click to fill secret
+const allowedWordsDiv = document.getElementById("allowedWords");
+allowedWordsDiv.innerHTML = "Allowed words:<br>";
+tiles.forEach(t=>{
+  const span = document.createElement("span");
+  span.textContent = t;
+  span.onclick = ()=>secretTerm.value = t;
+  allowedWordsDiv.appendChild(span);
+});
 
-// ===== Create / Join =====
+// ===== Create / Join Room =====
 function createRoom(){
   player = playerName.value.trim();
   secret = secretTerm.value.trim();
   if(!player || !secret) return alert("Fill all fields");
-  if(!tiles.includes(secret)) return alert("Secret word must be one from the allowed list");
-
+  if(!tiles.includes(secret)) return alert("Secret word must be from allowed words");
   room = Math.random().toString(36).substr(2,5).toUpperCase();
   playerNumber = 1;
-
   db.ref("rooms/"+room).set({
     p1Name: player, p1Secret: secret,
-    p2Name: "", p2Secret: "",
-    turn: 1,
-    round: 1,
-    chat: [],
-    guesses: { p1:null, p2:null }
+    p2Name:"", p2Secret:"",
+    turn:1,
+    round:1,
+    chat:[],
+    guesses:{p1:null,p2:null}
   });
-
-  alert("Room Code: " + room);
+  alert("Room created! Room Code: "+room);
   startGame();
 }
 
@@ -197,18 +132,11 @@ function joinRoom(){
   player = playerName.value.trim();
   secret = secretTerm.value.trim();
   room = roomCode.value.trim().toUpperCase();
-
-  if(!tiles.includes(secret)) return alert("Secret word must be one from the allowed list");
-
+  if(!tiles.includes(secret)) return alert("Secret word must be from allowed words");
   db.ref("rooms/"+room).get().then(s=>{
     if(!s.exists()) return alert("Room not found");
-
     playerNumber = 2;
-    db.ref("rooms/"+room).update({
-      p2Name: player,
-      p2Secret: secret
-    });
-
+    db.ref("rooms/"+room).update({p2Name:player, p2Secret:secret});
     startGame();
   });
 }
@@ -224,10 +152,10 @@ function startGame(){
 function loadBoard(){
   deductionBoard.innerHTML="";
   tiles.forEach(t=>{
-    const d=document.createElement("div");
-    d.className="tile";
-    d.textContent=t;
-    d.onclick=()=>d.classList.toggle("used");
+    let d = document.createElement("div");
+    d.className = "tile";
+    d.textContent = t;
+    d.onclick = ()=>d.classList.toggle("used");
     deductionBoard.appendChild(d);
   });
 }
@@ -236,64 +164,38 @@ function loadBoard(){
 function sendChat(){
   const msg = chatInput.value.trim();
   if(!msg) return;
-
-  db.ref("rooms/"+room+"/chat").push({
-    sender: player,
-    message: msg,
-    system: false
-  });
-
+  db.ref("rooms/"+room+"/chat").push({sender:player,message:msg,system:false});
   chatInput.value="";
 }
 
-// ===== Sync =====
+// ===== Listen Room =====
 function listenRoom(){
-  db.ref("rooms/"+room).on("value", s=>{
-    const d=s.val(); if(!d) return;
-
-    turnText.textContent = "Turn: " + (d.turn===1 ? d.p1Name : d.p2Name);
+  db.ref("rooms/"+room).on("value",s=>{
+    const d = s.val(); if(!d) return;
+    turnText.textContent = "Turn: "+(d.turn===1?d.p1Name:d.p2Name);
     round.textContent = d.round;
-
-    // Show guess section if max rounds reached
-    if(d.round > maxRounds){
-      guessSection.classList.remove("hidden");
-    }
+    if(d.round>maxRounds) guessSection.classList.remove("hidden");
 
     // Update chat
     chatBox.innerHTML="";
     if(d.chat){
       Object.values(d.chat).forEach(c=>{
-        const p=document.createElement("p");
-        p.innerHTML = c.system
-          ? `<span class="system">${c.message}</span>`
-          : `<strong>${c.sender}:</strong> ${c.message}`;
+        const p = document.createElement("p");
+        p.innerHTML = c.system ? `<span class="system">${c.message}</span>` : `<strong>${c.sender}:</strong> ${c.message}`;
         chatBox.appendChild(p);
       });
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // Check winner if both guesses exist
+    // Check winner after guesses
     if(d.guesses.p1 && d.guesses.p2){
       let winner=null;
-      if(d.guesses.p1===d.p2Secret && d.guesses.p2===d.p1Secret){
-        winner="Both guessed correctly! It's a tie!";
-      } else if(d.guesses.p1===d.p2Secret){
-        winner=`${d.p1Name} wins!`;
-      } else if(d.guesses.p2===d.p1Secret){
-        winner=`${d.p2Name} wins!`;
-      } else {
-        winner="No one guessed correctly. It's a tie!";
-      }
-
-      db.ref("rooms/"+room+"/chat").push({
-        sender: "System",
-        message: `🏆 Game Over! ${winner}`,
-        system: true
-      });
-
+      if(d.guesses.p1===d.p2Secret && d.guesses.p2===d.p1Secret) winner="Both guessed correctly! Tie!";
+      else if(d.guesses.p1===d.p2Secret) winner=`${d.p1Name} wins!`;
+      else if(d.guesses.p2===d.p1Secret) winner=`${d.p2Name} wins!`;
+      else winner="No one guessed correctly. Tie!";
+      db.ref("rooms/"+room+"/chat").push({sender:"System",message:"🏆 Game Over! "+winner,system:true});
       alert("Game Over! "+winner);
-
-      // Disable guess input
       guessInput.disabled=true;
       guessSection.querySelector("button").disabled=true;
     }
@@ -305,16 +207,9 @@ function askQuestion(){
   db.ref("rooms/"+room).get().then(s=>{
     const d = s.val();
     if(d.turn !== playerNumber) return alert("Not your turn");
-
     const q = questionInput.value.trim();
     if(!q) return;
-
-    db.ref("rooms/"+room+"/chat").push({
-      sender: "System",
-      message: `❓ ${player} asks: ${q}`,
-      system: true
-    });
-
+    db.ref("rooms/"+room+"/chat").push({sender:"System",message:`❓ ${player} asks: ${q}`,system:true});
     questionInput.value="";
   });
 }
@@ -323,17 +218,8 @@ function answer(ans){
   db.ref("rooms/"+room).get().then(s=>{
     const d = s.val();
     if(d.turn === playerNumber) return alert("Wait for opponent");
-
-    db.ref("rooms/"+room+"/chat").push({
-      sender: "System",
-      message: `🟢 ${player} answered: ${ans}`,
-      system: true
-    });
-
-    db.ref("rooms/"+room).update({
-      turn: d.turn === 1 ? 2 : 1,
-      round: d.round + 1
-    });
+    db.ref("rooms/"+room+"/chat").push({sender:"System",message:`🟢 ${player} answered: ${ans}`,system:true});
+    db.ref("rooms/"+room).update({turn:d.turn===1?2:1, round:d.round+1});
   });
 }
 
@@ -342,19 +228,12 @@ function submitGuess(){
   const g = guessInput.value.trim();
   if(!g) return alert("Enter your guess!");
   if(!tiles.includes(g)) return alert("Guess must be from allowed words");
-
-  const key = playerNumber===1 ? 'p1' : 'p2';
+  const key = playerNumber===1?'p1':'p2';
   db.ref("rooms/"+room+"/guesses/"+key).set(g);
   guessInput.disabled=true;
   guessSection.querySelector("button").disabled=true;
-
-  db.ref("rooms/"+room+"/chat").push({
-    sender: "System",
-    message: `${player} submitted their guess: ${g}`,
-    system: true
-  });
+  db.ref("rooms/"+room+"/chat").push({sender:"System",message:`${player} submitted their guess: ${g}`,system:true});
 }
 </script>
-
 </body>
 </html>
