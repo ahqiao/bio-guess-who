@@ -10,30 +10,24 @@ h1 { color:#5c6bc0; }
 button { background:#9575cd; color:white; border:none; border-radius:10px; padding:8px 12px; margin:5px; cursor:pointer; }
 button:hover { background:#7e57c2; }
 input { width:95%; padding:8px; margin:5px 0; border-radius:8px; border:1px solid #cfd8dc; }
-#deductionBoard { display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; margin-top:10px; max-height:300px; overflow-y:auto; }
-.tile { padding:10px; border:1px solid #cfd8dc; border-radius:8px; text-align:center; cursor:pointer; background:#fafafa; font-size:14px; min-height:40px; display:flex; align-items:center; justify-content:center; }
+#deductionBoard { display:grid; grid-template-columns: repeat(2, 1fr); gap:5px; margin-top:10px; max-height:200px; overflow-y:auto; }
+.tile { padding:6px; border:1px solid #cfd8dc; border-radius:6px; text-align:center; cursor:pointer; background:#fafafa; transition:0.3s; display:flex; align-items:center; justify-content:center; min-height:40px; }
 .tile.used { opacity:0.4; background:#ddd; pointer-events:none; }
 #log { background:#f5f5f5; padding:10px; border-radius:6px; max-height:120px; overflow-y:auto; margin-top:10px; font-size:14px; }
 .hidden { display:none; }
-#setupDeduction, #ruleBoard { background:#f5f5f5; border:1px solid #cfd8dc; border-radius:8px; padding:10px; max-height:200px; overflow-y:auto; margin-top:10px; font-size:14px; }
+#rules { background:#e8eaf6; padding:10px; border-radius:8px; margin-bottom:10px; }
 </style>
 </head>
 <body>
 
 <div class="card" id="setup">
   <h1>🧬 Bio Guess Who – Live</h1>
-  <div id="ruleBoard">
-    <strong>Rules:</strong>
-    <p>Guess the opponent's word and you will win! Ask yes/no questions to acquire hints about the word you are guessing.</p>
+  <div id="rules">
+    <strong>Rules:</strong> Guess the opponent's word to win! Ask YES/NO questions to acquire hints. Maximum 10 rounds.
   </div>
   <input id="playerName" placeholder="Your Name">
   <input id="secretTerm" placeholder="Your secret term">
-
-  <div id="setupDeduction">
-    <strong>Allowed terms:</strong>
-    <div id="setupTiles"></div>
-  </div>
-
+  <div style="font-size:12px; margin-bottom:5px;">Allowed terms for deduction board: Heart, Kidney, Liver, Lungs, Stomach, Intestine, Pancreas, Brain, Femur, Humerus, Skull, Rib, Vertebra, Clavicle, Tibia, Fibula, Amylase, Lipase, Pepsin, Trypsin, DNA Polymerase, Catalase, Lactase, Red Blood Cell, White Blood Cell, Neuron, Muscle Cell, Epithelial Cell, Sperm Cell, Egg Cell, Mitochondrion, Nucleus, Ribosome, Chloroplast</div>
   <button onclick="createRoom()">Create Game</button>
   <input id="roomCode" placeholder="Room code to join">
   <button onclick="joinRoom()">Join Game</button>
@@ -42,23 +36,22 @@ input { width:95%; padding:8px; margin:5px 0; border-radius:8px; border:1px soli
 <div class="card hidden" id="game">
   <h2 id="turnText"></h2>
   <p>Round: <span id="round">1</span>/10</p>
-  
-  <div id="qaSection">
-    <input id="questionInput" placeholder="Ask a YES/NO question">
-    <button onclick="askQuestion()">Ask Question</button>
-    <p>Answer the question:</p>
-    <button onclick="answer('YES')">YES</button>
-    <button onclick="answer('NO')">NO</button>
-  </div>
+  <input id="questionInput" placeholder="Ask a YES/NO question">
+  <button onclick="askQuestion()">Ask Question</button>
+  <p>Answer the question:</p>
+  <button onclick="answer('YES')">YES</button>
+  <button onclick="answer('NO')">NO</button>
+  <h3>Deduction Board</h3>
+  <div id="deductionBoard"></div>
 
   <div id="guessSection" class="hidden">
-    <h3>Time to Guess!</h3>
-    <input id="guessInput" placeholder="Enter your guess for opponent's secret term">
+    <p>Make your guess!</p>
+    <input id="guessInput" placeholder="Type your guess">
     <button onclick="submitGuess()">Submit Guess</button>
   </div>
 
-  <h3>Deduction Board</h3>
-  <div id="deductionBoard"></div>
+  <button id="resetBtn" onclick="requestReset()">Reset Game</button>
+
   <div id="log"></div>
 </div>
 
@@ -82,8 +75,6 @@ let secret = "";
 let playerNumber = null;
 let currentRound = 1;
 const maxRounds = 10;
-
-// ===== Deduction tiles =====
 const tiles = [
   "Heart","Kidney","Liver","Lungs","Stomach","Intestine","Pancreas","Brain",
   "Femur","Humerus","Skull","Rib","Vertebra","Clavicle","Tibia","Fibula",
@@ -96,7 +87,6 @@ function createRoom(){
   player = document.getElementById("playerName").value.trim();
   secret = document.getElementById("secretTerm").value.trim();
   if(!player || !secret){ alert("Enter name and secret term!"); return; }
-  if(!tiles.includes(secret)){ alert("Secret term must be from the allowed list!"); return; }
   room = Math.random().toString(36).substr(2,5).toUpperCase();
   playerNumber = 1;
   db.ref('rooms/'+room).set({
@@ -109,7 +99,8 @@ function createRoom(){
     question: "",
     answer: "",
     log: [],
-    guesses: {}
+    guesses: { p1:null, p2:null },
+    resetRequest: null
   });
   alert("Game created! Room code: "+room);
   startGameUI();
@@ -120,7 +111,6 @@ function joinRoom(){
   secret = document.getElementById("secretTerm").value.trim();
   room = document.getElementById("roomCode").value.trim().toUpperCase();
   if(!player || !secret || !room){ alert("Enter name, secret term, and room code!"); return; }
-  if(!tiles.includes(secret)){ alert("Secret term must be from the allowed list!"); return; }
   db.ref('rooms/'+room).get().then(snapshot=>{
     if(!snapshot.exists()){ alert("Room not found"); return; }
     const data = snapshot.val();
@@ -139,29 +129,16 @@ function startGameUI(){
   listenRoom();
 }
 
-// ===== Display deduction list in setup =====
-function displaySetupTiles(){
-  const container = document.getElementById("setupTiles");
-  container.innerHTML = "";
-  tiles.forEach(t=>{
-    const tile = document.createElement("div");
-    tile.className = "tile";
-    tile.textContent = t;
-    container.appendChild(tile);
-  });
-}
-displaySetupTiles();
-
-// ===== Deduction Board in game =====
+// ===== Deduction Board =====
 function loadDeductionBoard(){
   const board = document.getElementById("deductionBoard");
-  board.innerHTML = "";
+  board.innerHTML="";
   tiles.forEach(t=>{
-    const tile = document.createElement("div");
-    tile.className = "tile";
-    tile.textContent = t;
-    tile.onclick = ()=> tile.classList.toggle("used");
-    board.appendChild(tile);
+    const div = document.createElement("div");
+    div.className="tile";
+    div.textContent = t;
+    div.onclick = ()=>div.classList.toggle("used");
+    board.appendChild(div);
   });
 }
 
@@ -172,25 +149,28 @@ function listenRoom(){
     if(!data) return;
     currentRound = data.round;
     document.getElementById("round").textContent = currentRound;
-
-    let turnPlayer = data.turn===1?data.p1Name:data.p2Name;
+    const turnPlayer = data.turn===1?data.p1Name:data.p2Name;
     document.getElementById("turnText").textContent = "Turn: "+turnPlayer;
 
+    // Show log
     const l = document.getElementById("log");
     l.innerHTML = "";
-    if(data.question) log(turnPlayer + " asked: " + data.question);
-    if(data.answer) log("Answer: " + data.answer);
+    if(data.log) data.log.forEach(m=>{ l.innerHTML += "<p>"+m+"</p>"; });
 
-    // After maxRounds, show guess section
+    // Show guess section if max rounds reached
     if(currentRound > maxRounds){
-      document.getElementById("qaSection").classList.add("hidden");
       document.getElementById("guessSection").classList.remove("hidden");
     }
+  });
 
-    // Check if both guesses are in to announce winner
-    if(data.guesses && data.guesses.p1 && data.guesses.p2){
-      announceWinner(data);
-    }
+  // Listen for reset requests
+  db.ref('rooms/'+room+'/resetRequest').on('value', snapshot => {
+    const data = snapshot.val();
+    if(!data) return;
+    if(data.from === player) return; // ignore own request
+    const accept = confirm(`Player ${data.from} requested to reset the game. Do you agree?`);
+    if(accept) performReset();
+    else db.ref('rooms/'+room+'/resetRequest').remove();
   });
 }
 
@@ -202,6 +182,7 @@ function askQuestion(){
     const q = document.getElementById("questionInput").value.trim();
     if(!q) return;
     db.ref('rooms/'+room).update({ question: q, answer: "" });
+    db.ref('rooms/'+room+'/log').push(`Question: ${q}`);
     document.getElementById("questionInput").value="";
   });
 }
@@ -211,56 +192,83 @@ function answer(ans){
     const data = snapshot.val();
     if(playerNumber === data.turn){ alert("Wait for opponent to ask"); return; }
     db.ref('rooms/'+room).update({ answer: ans });
+    db.ref('rooms/'+room+'/log').push(`Answer: ${ans}`);
     endTurn();
   });
 }
 
-// ===== Turns & Rounds =====
+// ===== Turns =====
 function endTurn(){
   currentRound++;
-  if(currentRound <= maxRounds){
-    db.ref('rooms/'+room+'/round').set(currentRound);
-    db.ref('rooms/'+room).get().then(snapshot=>{
-      const data = snapshot.val();
-      const nextTurn = data.turn === 1 ? 2 : 1;
-      db.ref('rooms/'+room+'/turn').set(nextTurn);
-    });
-  } else {
-    document.getElementById("qaSection").classList.add("hidden");
-    document.getElementById("guessSection").classList.remove("hidden");
-  }
+  db.ref('rooms/'+room+'/round').set(currentRound);
+  db.ref('rooms/'+room).get().then(snapshot=>{
+    const data = snapshot.val();
+    const nextTurn = data.turn===1?2:1;
+    db.ref('rooms/'+room+'/turn').set(nextTurn);
+  });
 }
 
 // ===== Guessing =====
 function submitGuess(){
   const guess = document.getElementById("guessInput").value.trim();
-  if(!guess) return alert("Enter your guess!");
-  if(!tiles.includes(guess)){ alert("Guess must be from the allowed list!"); return; }
-  const key = playerNumber===1?"p1":"p2";
-  db.ref('rooms/'+room+'/guesses/'+key).set(guess);
-  document.getElementById("guessInput").value="";
-  log("Your guess submitted: "+guess);
+  if(!guess){ alert("Enter a guess!"); return; }
+
+  const playerKey = playerNumber===1?'p1':'p2';
+  db.ref('rooms/'+room+'/guesses/'+playerKey).set(guess).then(checkWinner);
+  document.getElementById("guessInput").disabled = true;
+  document.querySelector("#guessSection button").disabled = true;
 }
 
-// ===== Winner announcement =====
-function announceWinner(data){
-  const p1Correct = data.guesses.p1.toLowerCase() === data.p2Secret.toLowerCase();
-  const p2Correct = data.guesses.p2.toLowerCase() === data.p1Secret.toLowerCase();
-  let message = "";
-  if(p1Correct && p2Correct) message = `Both guessed correctly! It's a tie!`;
-  else if(p1Correct) message = `Player 1 (${data.p1Name}) wins!`;
-  else if(p2Correct) message = `Player 2 (${data.p2Name}) wins!`;
-  else message = `No one guessed correctly! No winner.`;
-  alert(message);
-  log(message);
+function checkWinner(){
+  db.ref('rooms/'+room).get().then(snapshot=>{
+    const data = snapshot.val();
+    if(!data.guesses.p1 || !data.guesses.p2) return; // wait for both guesses
+
+    let winner = null;
+    if(data.guesses.p1 === data.p2Secret && data.guesses.p2 === data.p1Secret){
+      winner = "Both guessed correctly! It's a tie!";
+    } else if(data.guesses.p1 === data.p2Secret){
+      winner = `${data.p1Name} wins!`;
+    } else if(data.guesses.p2 === data.p1Secret){
+      winner = `${data.p2Name} wins!`;
+    } else {
+      winner = "No one guessed correctly. It's a tie!";
+    }
+
+    alert("Game Over! "+winner);
+  });
 }
-  
-// ===== Log helper =====
-function log(msg){
-  const l = document.getElementById("log");
-  l.innerHTML += "<p>"+msg+"</p>";
-  l.scrollTop = l.scrollHeight;
+
+// ===== Reset Game =====
+function requestReset(){
+  if(!confirm("Do you want to request a reset? Both players must confirm.")) return;
+  db.ref('rooms/'+room+'/resetRequest').set({ from: player, timestamp: Date.now() });
+}
+
+function performReset(){
+  db.ref('rooms/'+room).get().then(snapshot=>{
+    const data = snapshot.val();
+    if(!data) return;
+    db.ref('rooms/'+room).update({
+      turn: 1,
+      round: 1,
+      question: "",
+      answer: "",
+      log: [],
+      guesses: { p1:null, p2:null },
+      resetRequest: null
+    });
+    currentRound = 1;
+    document.getElementById("round").textContent = currentRound;
+    document.getElementById("log").innerHTML = "";
+    document.querySelectorAll("#deductionBoard .tile").forEach(t => t.classList.remove("used"));
+    document.getElementById("guessSection").classList.add("hidden");
+    document.getElementById("guessInput").disabled = false;
+    document.querySelector("#guessSection button").disabled = false;
+    alert("Game has been reset! Start asking questions again.");
+  });
 }
 </script>
 </body>
 </html>
+
